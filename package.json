@@ -3,14 +3,26 @@
   "version": "0.1.0",
   "description": "Score how AI-readable a codebase is — offline, no keys needed.",
   "type": "module",
-  "files": ["src"],
+  "files": [
+    "src"
+  ],
   "bin": {
     "ai-readability": "src/cli.js"
   },
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "keywords": ["ai", "llm", "tokens", "context", "cost", "claude", "copilot", "cursor", "vscode"],
+  "keywords": [
+    "ai",
+    "llm",
+    "tokens",
+    "context",
+    "cost",
+    "claude",
+    "copilot",
+    "cursor",
+    "vscode"
+  ],
   "author": "Samrat Das",
   "license": "MIT",
   "repository": {
@@ -22,6 +34,7 @@
     "url": "https://github.com/dassamrat11/ai-readability/issues"
   },
   "dependencies": {
-    "gpt-tokenizer": "^3.4.0"
+    "gpt-tokenizer": "^3.4.0",
+    "kleur": "^4.1.5"
   }
 }
