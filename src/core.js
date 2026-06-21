@@ -77,7 +77,7 @@ function matchIgnore(rel, patterns) {
   return false;
 }
 
-const SKIP = new Set(['node_modules', '.git', 'dist', 'build', '.next', 'coverage']);
+const SKIP = new Set(['node_modules', '.git', 'dist', 'build', '.next', 'coverage', '.claude', '.cursor']);
 
 const TEXT = new Set([
   '.js', '.ts', '.jsx', '.tsx',
@@ -104,4 +104,29 @@ export function walk(dir, ignore = [], out = [], _root) {
     }
   }
   return out;
+}
+
+export function scoreRepo(dir, { ignorePatterns = [] } = {}) {
+  const ignore = [...loadIgnore(dir), ...ignorePatterns];
+  const files  = walk(dir, ignore);
+  if (!files.length) {
+    return { root: dir, scannedAt: new Date().toISOString(), total: 0, score: 0, grade: 'F', files: [] };
+  }
+  const rows = files.map(f => {
+    const rel = path.relative(dir, f);
+    const s   = scoreText(fs.readFileSync(f, 'utf8'));
+    return { file: rel, ...s, waste: s.tokens * (1 - s.value / 100) };
+  });
+  const total = rows.reduce((a, r) => a + r.tokens, 0);
+  const score = total
+    ? Math.round(rows.reduce((a, r) => a + r.value * r.tokens, 0) / total)
+    : 0;
+  return {
+    root: dir,
+    scannedAt: new Date().toISOString(),
+    total,
+    score,
+    grade: gradeOf(score),
+    files: rows.sort((a, b) => b.waste - a.waste),
+  };
 }

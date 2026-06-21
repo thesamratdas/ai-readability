@@ -1,0 +1,37 @@
+name: Update AI-Readability Badge
+
+on:
+  push:
+    branches: [main]
+
+# Allow the job to commit badge.svg back to the repo
+permissions:
+  contents: write
+
+jobs:
+  badge:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate badge
+        run: node src/cli.js . --badge badge.svg --no-color
+
+      - name: Commit badge if changed
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add badge.svg
+          git diff --staged --quiet || (
+            git commit -m "chore: update AI-readability badge [skip ci]" &&
+            git push
+          )

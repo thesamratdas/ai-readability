@@ -1,8 +1,13 @@
 {
   "name": "ai-readability",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Score how AI-readable a codebase is — offline, no keys needed.",
   "type": "module",
+  "main": "src/index.js",
+  "exports": {
+    ".": "./src/index.js"
+  },
+  "types": "src/types.d.ts",
   "files": [
     "src"
   ],
@@ -10,7 +15,7 @@
     "ai-readability": "src/cli.js"
   },
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "node --test test/index.test.js"
   },
   "keywords": [
     "ai",

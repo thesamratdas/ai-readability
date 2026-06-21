@@ -1,91 +1,272 @@
 # ai-readability
 
+![AI-Readability](./badge.svg)
 [![npm](https://img.shields.io/npm/v/ai-readability)](https://www.npmjs.com/package/ai-readability)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Node.js](https://img.shields.io/badge/node-%3E%3D16-brightgreen)](https://nodejs.org)
 
-Instantly score how AI-readable your codebase is — token count, signal quality, and which files to exclude before sending to an LLM.
+**Find out what your codebase costs to feed an AI — and whether it even fits.**
 
-AI tools like Cursor, GitHub Copilot, and Claude have limited context windows and charge per token. Most codebases silently waste 80–98% of that budget on generated files, minified output, and lock files that AI tools can't reason about anyway. This tool tells you exactly what to cut.
+Most repos silently waste 80–98% of their token budget on generated files, lock files, and minified output that AI tools can't reason about anyway. `ai-readability` scans a directory, prices it across 14 models from Anthropic, OpenAI, and Google, and tells you exactly which files to cut. Offline. No API keys. Under a second.
 
-## Requirements
+## Example
 
-Node.js 16 or later.
+Running against a Playwright project with generated reports left in:
 
-## Installation
+```
+npx ai-readability ./my-playwright-project
+```
 
-**Run without installing (recommended for one-off checks):**
+```
+  📦 ./my-playwright-project
+  ──────────────────────────────────────────────────────────────────────
+
+  Grade F  ·  226,533 tokens  ·  Score 38/100  ·  18 files
+
+  Context fit
+    Claude Sonnet 4.6 (1M)       23%  ✓   $0.679/run
+    GPT-4o (128K)               177%  ✗   OVERFLOW
+    Gemini 2.0 Flash (1M)        22%  ✓   $0.023/run
+
+  Token breakdown  top 10 by waste
+  ──────────────────────────────────────────────────────────────────────
+  F  ████████████████████████  97%   219925 tok  playwright-report/index.html
+  C  ░░░░░░░░░░░░░░░░░░░░░░░░   1%     1165 tok  package-lock.json
+  A  ░░░░░░░░░░░░░░░░░░░░░░░░   0%      885 tok  README.md
+  A  ░░░░░░░░░░░░░░░░░░░░░░░░   0%      585 tok  tests/Shopping.spec.js
+  A  ░░░░░░░░░░░░░░░░░░░░░░░░   0%      584 tok  playwright.config.js
+  B  ░░░░░░░░░░░░░░░░░░░░░░░░   0%      403 tok  tests/Sorting.spec.js
+  A  ░░░░░░░░░░░░░░░░░░░░░░░░   0%      266 tok  pages/CheckoutInfo.js
+
+  💡 Exclude 5 file(s)  F → A  ·  save 221,862 tokens (98%)
+
+    [generated]            219925 tok  playwright-report/index.html
+    [generated]              1165 tok  package-lock.json
+    [generated]               364 tok  playwright-report/data/8d9e8c1a.md
+    [generated]               364 tok  test-results/Login-loginPage-chromium/error-context.md
+    [generated]                44 tok  test-results/.last-run.json
+
+  📋 Paste into .aiignore / .cursorignore:
+    playwright-report/
+    package-lock.json
+    test-results/
+
+  Tip: run with --fix to write .aiignore automatically.
+
+  After exclusions  (4,671 tokens)
+    Claude Sonnet 4.6 (1M)       <1%  ✓   $0.014/run
+    GPT-4o (128K)                 4%  ✓   $0.012/run
+    Gemini 2.0 Flash (1M)        <1%  ✓   $0.0005/run
+```
+
+From 226K tokens (GPT-4o overflowing its context entirely, costing $0.68/run) down to 4.7K — one `--fix` pass.
+
+## Quick Start
+
+**One-off scan:**
 
 ```bash
 npx ai-readability .
+npx ai-readability . --cost     # full 14-model cost and context table
+npx ai-readability . --fix      # auto-write .aiignore exclusions
+npx ai-readability . --cost --fix   # both at once
 ```
 
 **Install globally for repeated use:**
 
 ```bash
 npm install -g ai-readability
-ai-readability .
 ai-readability /path/to/any/project
 ```
 
-## Example
+## All options
 
-Running against a Playwright test project:
-
-```
-$ npx ai-readability ./my-playwright-project
-
-📦 ./my-playwright-project
-🪙 226,533 tokens · Grade F (38/100)
-
-Worst offenders (tokens × low score):
-  F   219925 tok  97%  playwright-report/index.html
-  C     1165 tok  1%   package-lock.json
-  A      584 tok  0%   playwright.config.js
-  B      403 tok  0%   tests/Sorting.spec.js
-  A      585 tok  0%   tests/Shopping.spec.js
-  A      885 tok  0%   README.md
-  B      183 tok  0%   .github/workflows/playwright.yml
-  A      266 tok  0%   pages/CheckoutInfo.js
-
-💡 Exclude 5 file(s) → grade F → A, save 221,862 tokens (98%)
-  - [generated]  219925 tok  playwright-report/index.html
-  - [generated]    1165 tok  package-lock.json
-  - [generated]     364 tok  playwright-report/data/8d9e8c1a.md
-  - [generated]     364 tok  test-results/Login-loginPage-chromium/error-context.md
-  - [generated]      44 tok  test-results/.last-run.json
-
-📋 Add to .aiignore / .cursorignore:
-  playwright-report/
-  package-lock.json
-  test-results/
-```
-
-The tool correctly identifies that 98% of tokens are in a generated HTML report that provides zero signal to an AI model.
-
-## What it measures
-
-| Metric | What it detects |
+| Flag | Description |
 |---|---|
-| **Signal** | Minified lines, base64 blobs, and dense text with no whitespace |
-| **Structure** | Blank-line density and function/class/heading boundaries — higher structure = easier for AI to chunk and cite |
-| **Redundancy** | Duplicate lines that inflate token count without adding meaning |
-| **Grade** | A (≥90) · B (≥75) · C (≥60) · D (≥45) · F (<45) |
+| `--cost` | Full per-model cost and context window table (14 models, 3 providers) |
+| `--fix` | Auto-write suggested exclusion patterns to `.aiignore` |
+| `--json` | Structured JSON output — for CI pipelines or `jq` |
+| `--watch` | Re-scan and refresh automatically on every file change |
+| `--top <N>` | Show top N files in the bar chart [default: 10] |
+| `--badge [file]` | Write an SVG grade badge [default: `<dir>/ai-readability-badge.svg`] |
+| `--no-color` | Disable ANSI color — auto-disabled when piping or in CI |
+| `--version` | Print version number |
+| `--help` / `-h` | Show usage |
 
-Files are automatically flagged as:
-- `generated` — lock files, build output, test reports, source maps
-- `low-signal` — score F or D, mostly noise
-- `token-hog` — consumes >10% of total tokens
+## How it works
 
-The suggested `.aiignore` / `.cursorignore` patterns are ready to paste directly into your project.
+### Scoring
+
+Each file is scored 0–100 across three dimensions, then token-weighted into a repo-wide score:
+
+| Metric | Weight | What it detects |
+|---|---|---|
+| **Signal** | 60% | Minified lines, base64 blobs, dense text with no whitespace |
+| **Structure** | 25% | Blank-line density and function/class/heading boundaries |
+| **Redundancy** | 15% | Duplicate lines that inflate tokens without adding meaning |
+
+**Grade thresholds:** A ≥ 90 · B ≥ 75 · C ≥ 60 · D ≥ 45 · F < 45
+
+### Generated file detection
+
+Files are flagged `[generated]` when they match known build directories or filename patterns:
+
+- **Directories skipped entirely:** `dist/`, `build/`, `out/`, `coverage/`, `.next/`, `.nuxt/`, `playwright-report/`, `test-results/`, `__pycache__/`, `vendor/`, and more
+- **Lock files:** `package-lock.json`, `yarn.lock`, `pnpm-lock.yaml`, any `*.lock`
+- **Minified / compiled assets:** `*.min.js`, `*.min.css`, `*.bundle.js`, `*.map`, `*.generated.*`
+
+Add custom patterns via `.aiignore`.
+
+### Flagged file reasons
+
+| Reason | Meaning |
+|---|---|
+| `[generated]` | Build output, lock file, source map, or test artifact |
+| `[low-signal (F)]` | Score < 45 — file is mostly noise |
+| `[low-signal (D)]` | Score < 60 — low signal-to-token ratio |
+| `[token-hog (N%)]` | File uses > 10% of total repo tokens |
+
+## .aiignore
+
+Create `.aiignore` in your project root (same syntax as `.gitignore`) to exclude paths from the scan:
+
+```
+# .aiignore
+playwright-report/
+test-results/
+package-lock.json
+dist/
+*.min.js
+```
+
+**Auto-generate it:** `ai-readability . --fix` writes the patterns for you based on what the tool flags.
+
+Most AI editors respect equivalent files: Cursor reads `.cursorignore`, GitHub Copilot reads `.copilotignore`. A `.aiignore` gives you a single source of truth to copy into whichever you need.
+
+## Library API
+
+`ai-readability` is importable as a Node.js library — no subprocess needed:
+
+```js
+import { scoreRepo, scoreText, isGenerated } from 'ai-readability';
+
+// Score an entire directory (respects .aiignore automatically)
+const result = scoreRepo('./my-project');
+// → { root, scannedAt, total, score, grade, files }
+
+console.log(result.grade);   // 'A'
+console.log(result.total);   // 4671 (tokens)
+console.log(result.score);   // 89
+
+// Score a single string (no file I/O — useful for in-memory content)
+const { grade, tokens, value, signal } = scoreText(sourceCode);
+
+// Check if a relative path is generated output
+isGenerated('dist/bundle.js');    // true
+isGenerated('src/index.ts');      // false
+```
+
+Pass extra ignore patterns without needing a `.aiignore` file on disk:
+
+```js
+const result = scoreRepo('./src', {
+  ignorePatterns: ['*.generated.ts', 'fixtures/']
+});
+```
+
+**TypeScript:** full `.d.ts` declarations are bundled — no `@types/` package needed.
+
+```ts
+import { scoreRepo, type RepoResult } from 'ai-readability';
+const result: RepoResult = scoreRepo('./src');
+```
+
+## CI / CD
+
+### Auto-update the badge on push
+
+[`.github/workflows/badge.yml`](.github/workflows/badge.yml) runs on every push to `main`, generates `badge.svg` by running the CLI against the repo itself, and commits the updated file back if the grade changed. No secrets needed — it uses the built-in `GITHUB_TOKEN`.
+
+### JSON quality gates
+
+```bash
+# Fail the build if score drops below 50
+ai-readability . --json | jq -e '.score >= 50'
+
+# Show cost for a specific model
+ai-readability . --json | jq '.models[] | select(.name == "Claude Sonnet 4.6") | .costUsd'
+
+# Summarize token savings from .aiignore exclusions
+ai-readability . --json | jq '.savings'
+```
+
+JSON output schema:
+
+```json
+{
+  "root": "./my-project",
+  "scannedAt": "2026-06-21T10:00:00.000Z",
+  "total": 226533,
+  "grade": "F",
+  "score": 38,
+  "files": [...],
+  "flagged": [
+    { "file": "playwright-report/index.html", "reason": "generated", "tokens": 219925 }
+  ],
+  "savings": { "tokensSaved": 221862, "tokensAfter": 4671, "pctSaved": 98 },
+  "models": [
+    {
+      "name": "Claude Sonnet 4.6",
+      "provider": "Anthropic",
+      "ctxTokens": 1000000,
+      "fits": true,
+      "usagePct": 22.7,
+      "costUsd": 0.679,
+      "costAfterExclusionUsd": 0.014
+    }
+  ]
+}
+```
+
+## Supported models
+
+The `--cost` flag compares your repo against 14 models. All prices live in [`src/pricing.js`](src/pricing.js) — edit that file to add models or update prices (they change quarterly).
+
+| Provider | Models |
+|---|---|
+| **Anthropic** | Claude Opus 4.8, Claude Sonnet 4.6, Claude Haiku 4.5 |
+| **OpenAI** | GPT-4.1, GPT-4.1 mini, GPT-4.1 nano, GPT-4o, GPT-4o mini, o3, o4-mini |
+| **Google** | Gemini 2.5 Pro, Gemini 2.0 Flash, Gemini 1.5 Pro, Gemini 1.5 Flash |
+
+Prices shown are input/prompt token prices only. Output tokens are not included — for codebase-read use cases, input cost dominates.
 
 ## Privacy
 
-**100% local. No network requests. No API keys.** The tool runs entirely on your machine using an offline tokenizer. Your source code never leaves your computer.
+**100% local. No network requests. No API keys.**
+
+Token counting uses [`gpt-tokenizer`](https://www.npmjs.com/package/gpt-tokenizer) — an offline, MIT-licensed tokenizer. Your source code never leaves your machine.
+
+**ANSI colors** are auto-disabled when piping or in CI (`process.stdout.isTTY`). Force-disable with `--no-color`.
+
+**Watch mode on Linux:** `--watch` uses Node's `fs.watch` with `recursive: true`, which requires Node.js 22+ on Linux. On older versions it falls back to top-level watching with a console warning.
+
+**Windows:** backslashes in file paths are normalized internally — output always uses forward slashes.
+
+## Requirements
+
+Node.js 16 or later. No API keys. No network.
 
 ## Contributing
 
-Found a bug or want to suggest a file pattern? Open an issue at [github.com/dassamrat11/ai-readability/issues](https://github.com/dassamrat11/ai-readability/issues).
+```bash
+npm test   # runs 19 tests with node:test (no extra deps)
+```
+
+**To add a model or update prices:** edit [`src/pricing.js`](src/pricing.js) and update the `// prices as of YYYY-MM` date at the top.
+
+**To add a generated-file pattern:** add a regex to `GEN_FILE` or a directory name to `GEN_DIRS` in [`src/core.js`](src/core.js).
+
+Found a bug or want a missing pattern? Open an issue: [github.com/dassamrat11/ai-readability/issues](https://github.com/dassamrat11/ai-readability/issues)
 
 ## License
 
