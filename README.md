@@ -90,6 +90,7 @@ ai-readability /path/to/any/project
 | `--watch` | Re-scan and refresh automatically on every file change |
 | `--top <N>` | Show top N files in the bar chart [default: 10] |
 | `--badge [file]` | Write an SVG grade badge [default: `<dir>/ai-readability-badge.svg`] |
+| `--fail-under <N>` | Exit with code 1 if the repo score is below `N` — for CI gates; works with `--json` too |
 | `--no-color` | Disable ANSI color — auto-disabled when piping or in CI |
 | `--version` | Print version number |
 | `--help` / `-h` | Show usage |
@@ -224,7 +225,10 @@ Library API: `import { distillRepo, extractSkeleton, buildImportGraph, writeSumm
 ### JSON quality gates
 
 ```bash
-# Fail the build if score drops below 50
+# Fail the build if score drops below 50 (built in — no jq needed)
+ai-readability . --fail-under 50
+
+# Same thing via jq, if you need the raw JSON anyway
 ai-readability . --json | jq -e '.score >= 50'
 
 # Show cost for a specific model

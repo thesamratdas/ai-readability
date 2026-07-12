@@ -110,6 +110,8 @@ const doWatch  = has('--watch');
 const respectGi = has('--respect-gitignore');
 const noColor  = has('--no-color') || !process.stdout.isTTY;
 const topN     = Math.max(1, parseInt(opt('--top') ?? '10') || 10);
+const failUnderArg = opt('--fail-under');
+const failUnder = failUnderArg !== null ? Number(failUnderArg) : null;
 
 // --badge [file]: if no path given, default resolved after root is validated
 const badgeIdx  = argv.indexOf('--badge');
@@ -143,6 +145,7 @@ if (has('--help') || has('-h')) {
     --respect-gitignore  Also exclude files matched by .gitignore
     --top <N>        Show top N files by waste  [default: 10]
     --badge [file]   Write an SVG grade badge  [default: <dir>/ai-readability-badge.svg]
+    --fail-under <N> Exit with code 1 if score < N  (for CI; works with --json too)
     --no-color       Disable color output
     --version        Print version number
     -h, --help       Show this help message
@@ -156,6 +159,7 @@ if (has('--help') || has('-h')) {
     ai-readability . --watch
     ai-readability . --badge
     ai-readability . --badge ./docs/badge.svg
+    ai-readability . --fail-under 70
 `);
   process.exit(0);
 }
@@ -263,7 +267,7 @@ function render() {
 
   if (!rows.length) {
     console.log(kleur.yellow(`\n  No supported files found in "${root}"\n`));
-    return;
+    return null;
   }
 
   const total     = rows.reduce((a, r) => a + r.tokens, 0);
@@ -298,7 +302,7 @@ function render() {
       fs.writeFileSync(resolvedBadge, makeBadge(repoGrade, repoVal));
       process.stderr.write(`Badge → ${resolvedBadge}\n`);
     }
-    return;
+    return repoVal;
   }
 
   const rule = kleur.dim('─'.repeat(70));
@@ -340,7 +344,7 @@ function render() {
       console.log('\n  ' + kleur.green(`✅  Badge → ${resolvedBadge}`));
     }
     console.log();
-    return;
+    return repoVal;
   }
 
   const kept     = rows.filter(r => !flagged.some(f => f.file === r.file));
@@ -399,6 +403,7 @@ function render() {
   }
 
   console.log();
+  return repoVal;
 }
 
 // ── entry ─────────────────────────────────────────────────────────────────────
@@ -419,5 +424,8 @@ if (doWatch) {
     fs.watch(root, {}, handler);
   }
 } else {
-  render();
+  const repoVal = render();
+  if (failUnder !== null && repoVal !== null && repoVal < failUnder) {
+    process.exitCode = 1;
+  }
 }

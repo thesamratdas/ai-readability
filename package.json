@@ -15,7 +15,7 @@
     "ai-readability": "src/cli.js"
   },
   "scripts": {
-    "test": "node --test test/index.test.js"
+    "test": "node --test test/index.test.js test/cli.test.js"
   },
   "keywords": [
     "ai",
