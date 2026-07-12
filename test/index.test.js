@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { scoreText, isGenerated, isTextFile, gradeOf, scoreRepo, reasonFor, computePatterns, writeAiignore } from '../src/core.js';
+import { scoreText, isGenerated, isTextFile, gradeOf, scoreRepo, reasonFor, computePatterns, writeAiignore, walk } from '../src/core.js';
 import { MODELS, effectiveTokens, TOKEN_FACTOR } from '../src/pricing.js';
 import { extractSkeleton, buildImportGraph, distillRepo, writeSummaries } from '../src/distill.js';
 
@@ -289,6 +289,39 @@ test('scoreRepo: maxBytes skips oversized files', () => {
     const files = r.files.map(f => f.file.replace(/\\/g, '/'));
     assert.ok(files.includes('small.js'), 'small file kept');
     assert.ok(!files.includes('huge.js'), 'oversized file skipped');
+    assert.strictEqual(r.skippedFiles, 1, 'skippedFiles counts the one oversized file');
+  } finally {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  }
+});
+
+test('walk: **/*.js pattern matches root-level files, not just nested ones', () => {
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ai-readability-globroot-'));
+  try {
+    fs.writeFileSync(path.join(tmpDir, 'index.js'), 'export const a = 1;\n');
+    fs.mkdirSync(path.join(tmpDir, 'nested'));
+    fs.writeFileSync(path.join(tmpDir, 'nested', 'foo.js'), 'export const b = 2;\n');
+    fs.writeFileSync(path.join(tmpDir, 'keep.md'), '# keep\n');
+    const out = walk(tmpDir, ['**/*.js']);
+    const files = out.map(f => path.relative(tmpDir, f).replace(/\\/g, '/'));
+    assert.ok(!files.includes('index.js'), 'root-level index.js excluded by **/*.js');
+    assert.ok(!files.includes('nested/foo.js'), 'nested foo.js excluded by **/*.js');
+    assert.ok(files.includes('keep.md'), 'non-matching file kept');
+  } finally {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  }
+});
+
+test('scoreRepo: repeated calls with the same ignore patterns reuse cached regexes and return identical results', () => {
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ai-readability-cache-'));
+  try {
+    fs.writeFileSync(path.join(tmpDir, 'a.js'), 'export const a = 1;\n');
+    fs.writeFileSync(path.join(tmpDir, 'a.log'), 'noise\n');
+    const patterns = ['*.log', '**/*.test.js'];
+    const r1 = scoreRepo(tmpDir, { ignorePatterns: patterns });
+    const r2 = scoreRepo(tmpDir, { ignorePatterns: patterns });
+    assert.deepStrictEqual(r1.files.map(f => f.file), r2.files.map(f => f.file));
+    assert.strictEqual(r1.score, r2.score);
   } finally {
     fs.rmSync(tmpDir, { recursive: true, force: true });
   }
