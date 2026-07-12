@@ -1,6 +1,6 @@
 # ai-readability
 
-![AI-Readability](./badge.svg)
+![AI-Ready](./badge.svg)
 [![npm](https://img.shields.io/npm/v/ai-readability)](https://www.npmjs.com/package/ai-readability)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Node.js](https://img.shields.io/badge/node-%3E%3D16-brightgreen)](https://nodejs.org)
@@ -21,12 +21,14 @@ npx ai-readability ./my-playwright-project
   📦 ./my-playwright-project
   ──────────────────────────────────────────────────────────────────────
 
-  Grade F  ·  226,533 tokens  ·  Score 38/100  ·  18 files
+  AI-Ready: F  ·  ~$0.679 per full read  (Claude Sonnet 4.6)
+  Score 38/100  ·  18 files  ·  226,533 tokens
 
   Context fit
     Claude Sonnet 4.6 (1M)       23%  ✓   $0.679/run
     GPT-4o (128K)               177%  ✗   OVERFLOW
     Gemini 2.0 Flash (1M)        22%  ✓   $0.023/run
+    pricing as of 2026-06-28, estimates
 
   Token breakdown  top 10 by waste
   ──────────────────────────────────────────────────────────────────────
@@ -57,6 +59,9 @@ npx ai-readability ./my-playwright-project
     Claude Sonnet 4.6 (1M)       <1%  ✓   $0.014/run
     GPT-4o (128K)                 4%  ✓   $0.012/run
     Gemini 2.0 Flash (1M)        <1%  ✓   $0.0005/run
+
+  📋 Badge markdown (paste into your README):
+  ![AI-Ready](./ai-readability-badge.svg)
 ```
 
 From 226K tokens (GPT-4o overflowing its context entirely, costing $0.68/run) down to 4.7K — one `--fix` pass.

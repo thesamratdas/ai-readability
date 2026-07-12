@@ -26,7 +26,7 @@ test('--fail-under: exits 1 when the threshold cannot possibly be met', () => {
   try {
     const r = runCli([tmpDir, '--fail-under', '101', '--no-color']);
     assert.strictEqual(r.status, 1);
-    assert.match(r.stdout, /Grade/, 'normal output still printed before the exit code is set');
+    assert.match(r.stdout, /AI-Ready/, 'normal output still printed before the exit code is set');
   } finally {
     fs.rmSync(tmpDir, { recursive: true, force: true });
   }
@@ -37,7 +37,7 @@ test('--fail-under: exits 0 when the threshold is trivially met', () => {
   try {
     const r = runCli([tmpDir, '--fail-under', '0', '--no-color']);
     assert.strictEqual(r.status, 0);
-    assert.match(r.stdout, /Grade/);
+    assert.match(r.stdout, /AI-Ready/);
   } finally {
     fs.rmSync(tmpDir, { recursive: true, force: true });
   }

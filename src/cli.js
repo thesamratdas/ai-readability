@@ -313,7 +313,20 @@ function render() {
   console.log('\n' + kleur.bold(`  📦 ${root}`));
   console.log('  ' + rule);
 
-  // ── context fit (lead with token budget / cost, per positioning) ────────────
+  // ── headline: grade + $ cost together (the scorecard differentiator) ───────
+  const headlineModel = SUMMARY_MODELS[0];
+  const headlineCost  = effectiveTokens(total, headlineModel) / 1e6 * headlineModel.usdPerMTok;
+  console.log(
+    `\n  ${gc(repoGrade, kleur.bold(`AI-Ready: ${repoGrade}`))}  ·  ` +
+    `~$${headlineCost.toFixed(3)} per full read  ` +
+    kleur.dim(`(${headlineModel.name})`)
+  );
+  console.log(
+    kleur.dim(`  Score ${repoVal}/100  ·  ${rows.length} files  ·  ${fmt(total)} tokens`)
+  );
+  console.log();
+
+  // ── context fit (supporting detail, per positioning) ────────────────────────
   contextFit(total);
   console.log(kleur.dim(`    pricing as of ${PRICING_UPDATED_AT}, estimates`));
   if (showCost) costTable(total, '💰 Cost to send this repo to an AI');
@@ -397,17 +410,11 @@ function render() {
     console.log('\n  ' + kleur.green(`✅  Badge → ${resolvedBadge}`));
   }
 
-  // ── grade footer (compact — secondary to context-fit/cost) ─────────────────
-  console.log(
-    `\n  Grade ${gc(repoGrade, kleur.bold(repoGrade))}  ·  Score ${repoVal}/100  ·  ` +
-    `${rows.length} files  ·  ${kleur.bold(fmt(total))} tokens`
-  );
-
   // ── badge markdown (every run — the shareable, viral artifact) ──────────────
   const badgeFile = resolvedBadge ?? path.resolve(root, 'ai-readability-badge.svg');
   const badgeRel  = path.relative(root, badgeFile).replace(/\\/g, '/') || 'ai-readability-badge.svg';
   console.log('\n  ' + kleur.dim('📋 Badge markdown (paste into your README):'));
-  console.log('  ' + kleur.green(`![AI-Readability](./${badgeRel})`));
+  console.log('  ' + kleur.green(`![AI-Ready](./${badgeRel})`));
 
   console.log();
   return repoVal;
