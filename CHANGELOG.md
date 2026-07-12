@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.4.1] — 2026-07-12
+
+### Fixed
+- `scoreRepo` on a repo with zero scannable text files now returns `grade: 'N/A'` instead of a misleading `'F'`
+
 ## [0.4.0] — 2026-06-28
 
 ### Added
