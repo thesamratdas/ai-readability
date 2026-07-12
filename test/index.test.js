@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { scoreText, isGenerated, isTextFile, gradeOf, scoreRepo, reasonFor, computePatterns, writeAiignore, walk } from '../src/core.js';
+import { scoreText, isGenerated, isTextFile, gradeOf, scoreRepo, scoreRepoAsync, reasonFor, computePatterns, writeAiignore, walk } from '../src/core.js';
 import { MODELS, effectiveTokens, TOKEN_FACTOR } from '../src/pricing.js';
 import { extractSkeleton, buildImportGraph, distillRepo, writeSummaries } from '../src/distill.js';
 
@@ -147,6 +147,60 @@ test('scoreRepo on an empty repo returns grade N/A, not F', () => {
     assert.strictEqual(result.score, 0);
     assert.deepStrictEqual(result.files, []);
     assert.strictEqual(result.skippedFiles, 0);
+  } finally {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  }
+});
+
+// ── scoreRepoAsync (cross-repo API contract) ──────────────────────────────────
+
+function makeFixtureTree(n = 25) {
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ai-readability-async-'));
+  for (let i = 0; i < n; i++) {
+    fs.writeFileSync(path.join(tmpDir, `file${i}.js`), `export const v${i} = ${i};\nfunction f${i}() { return ${i}; }\n`);
+  }
+  return tmpDir;
+}
+
+test('scoreRepoAsync: results match sync scoreRepo on the same fixture tree', async () => {
+  const tmpDir = makeFixtureTree();
+  try {
+    const sync  = scoreRepo(tmpDir);
+    const async_ = await scoreRepoAsync(tmpDir);
+    assert.strictEqual(async_.total, sync.total);
+    assert.strictEqual(async_.score, sync.score);
+    assert.strictEqual(async_.grade, sync.grade);
+    assert.strictEqual(async_.skippedFiles, sync.skippedFiles);
+    assert.deepStrictEqual(async_.files, sync.files);
+  } finally {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  }
+});
+
+test('scoreRepoAsync: onProgress is called once per file with (done, total)', async () => {
+  const tmpDir = makeFixtureTree(25);
+  try {
+    const calls = [];
+    const result = await scoreRepoAsync(tmpDir, { onProgress: (done, total) => calls.push([done, total]) });
+    assert.strictEqual(calls.length, 25);
+    assert.deepStrictEqual(calls[0], [1, 25]);
+    assert.deepStrictEqual(calls[24], [25, 25]);
+    assert.strictEqual(result.files.length, 25);
+  } finally {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  }
+});
+
+test('scoreRepoAsync: an aborted signal stops the scan early', async () => {
+  const tmpDir = makeFixtureTree(25);
+  try {
+    const controller = new AbortController();
+    const result = await scoreRepoAsync(tmpDir, {
+      signal: controller.signal,
+      onProgress: (done) => { if (done === 3) controller.abort(); },
+    });
+    assert.ok(result.files.length < 25, 'scan stopped before scoring every file');
+    assert.ok(result.files.length >= 3, 'the files scored before abort took effect are still returned');
   } finally {
     fs.rmSync(tmpDir, { recursive: true, force: true });
   }

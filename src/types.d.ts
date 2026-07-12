@@ -46,8 +46,21 @@ export interface ScoreRepoOptions {
   maxBytes?: number;
 }
 
+export interface ScoreRepoAsyncOptions extends ScoreRepoOptions {
+  /** Called after each file is scored, with (filesScored, totalFiles). */
+  onProgress?: (done: number, total: number) => void;
+  /** When aborted, the scan stops after the in-flight file and returns a valid
+   * (partial) RepoResult computed from whatever was scored so far. */
+  signal?: AbortSignal;
+}
+
 export declare function scoreText(text: string): ScoreResult;
 export declare function scoreRepo(dir: string, options?: ScoreRepoOptions): RepoResult;
+/** Async twin of scoreRepo: same return shape, yields cooperatively between
+ * files so tokenization doesn't block the event loop, and supports
+ * onProgress/AbortSignal. Use this from host UIs (e.g. the VS Code
+ * extension); the CLI keeps using sync scoreRepo. */
+export declare function scoreRepoAsync(dir: string, options?: ScoreRepoAsyncOptions): Promise<RepoResult>;
 export declare function isGenerated(relativePath: string): boolean;
 export declare function isTextFile(name: string): boolean;
 export declare function gradeOf(value: number): 'A' | 'B' | 'C' | 'D' | 'F';

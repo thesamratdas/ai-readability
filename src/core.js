@@ -265,3 +265,52 @@ export function scoreRepo(dir, { ignorePatterns = [], respectGitignore = false, 
     skippedFiles: skipped.length,
   };
 }
+
+// Files between cooperative yields. encode() is synchronous and CPU-bound, so
+// fs.promises alone would not stop it from blocking the event loop — this
+// forces a setImmediate tick every N files so a host (e.g. the VS Code
+// extension) stays responsive and signal.aborted can actually be observed.
+const ASYNC_YIELD_EVERY = 10;
+
+// Async twin of scoreRepo with the exact same return shape. Directory walking
+// (fs.readdirSync/statSync in `walk`) stays synchronous — it's fast even on
+// large trees; the actual freeze is repeated encode() calls, which this
+// yields around. Not a drop-in replacement for scoreRepo: callers that need
+// progress/cancellation (host UIs) use this; the CLI keeps using sync
+// scoreRepo since it always runs to completion anyway.
+export async function scoreRepoAsync(dir, { ignorePatterns = [], respectGitignore = false, maxBytes = DEFAULT_MAX_BYTES, onProgress, signal } = {}) {
+  const ignore = [
+    ...loadIgnore(dir),
+    ...(respectGitignore ? loadGitignore(dir) : []),
+    ...ignorePatterns,
+  ];
+  const skipped = [];
+  const files  = walk(dir, ignore, [], undefined, maxBytes, skipped);
+  if (!files.length) {
+    return { root: dir, scannedAt: new Date().toISOString(), total: 0, score: 0, grade: 'N/A', files: [], skippedFiles: skipped.length };
+  }
+  const rows = [];
+  for (let i = 0; i < files.length; i++) {
+    if (signal?.aborted) break;
+    const f   = files[i];
+    const rel = path.relative(dir, f);
+    const text = await fs.promises.readFile(f, 'utf8');
+    const s    = scoreText(text);
+    rows.push({ file: rel, ...s, waste: s.tokens * (1 - s.value / 100) });
+    onProgress?.(i + 1, files.length);
+    if ((i + 1) % ASYNC_YIELD_EVERY === 0) await new Promise(setImmediate);
+  }
+  const total = rows.reduce((a, r) => a + r.tokens, 0);
+  const score = total
+    ? Math.round(rows.reduce((a, r) => a + r.value * r.tokens, 0) / total)
+    : 0;
+  return {
+    root: dir,
+    scannedAt: new Date().toISOString(),
+    total,
+    score,
+    grade: rows.length ? gradeOf(score) : 'N/A',
+    files: rows.sort((a, b) => b.waste - a.waste),
+    skippedFiles: skipped.length,
+  };
+}
