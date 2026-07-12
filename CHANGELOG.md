@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.5.0] — 2026-07-12
+
+### Added
+- `scoreRepoAsync(dir, opts)`: async twin of `scoreRepo` with `onProgress`/`AbortSignal` support, yielding cooperatively so tokenization doesn't block the event loop
+- `--fail-under <N>` CLI flag: exit code 1 if the repo score is below `N` (works with `--json`)
+- `writeToolIgnore(root, tool, patterns)`: syncs `.aiignore` exclusions into `.cursorignore` / `.codeiumignore` when that tool is detected
+- `createScanCache()`: per-file mtime cache for `--watch`, so unchanged files aren't retokenized on every save
+- `PRICING_UPDATED_AT` in `src/pricing.js`, surfaced in CLI output
+
+### Changed
+- CLI output leads with a `AI-Ready: <grade> · ~$X per full read` headline, then context-fit/cost, then token breakdown as supporting detail
+- Badge label changed from `AI-Readability: <grade>` to `AI-Ready: <grade>`
+- Badge markdown (`![AI-Ready](...)`) is now printed at the end of every run, not just with `--badge`
+- CI now runs on both `ubuntu-latest` and `windows-latest`
+
 ## [0.4.1] — 2026-07-12
 
 ### Fixed
