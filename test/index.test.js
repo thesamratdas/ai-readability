@@ -5,7 +5,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { scoreText, isGenerated, isTextFile, gradeOf, scoreRepo, scoreRepoAsync, reasonFor, computePatterns, writeAiignore, writeToolIgnore, walk, createScanCache } from '../src/core.js';
-import { MODELS, effectiveTokens, TOKEN_FACTOR } from '../src/pricing.js';
+import { MODELS, effectiveTokens, TOKEN_FACTOR, PRICING_UPDATED_AT } from '../src/pricing.js';
 import { extractSkeleton, buildImportGraph, distillRepo, writeSummaries } from '../src/distill.js';
 
 // ── grade determinism ─────────────────────────────────────────────────────────
@@ -453,6 +453,11 @@ test('every model carries a positive tokenFactor', () => {
   for (const m of MODELS) {
     assert.ok(typeof m.tokenFactor === 'number' && m.tokenFactor > 0, `${m.name}: tokenFactor`);
   }
+});
+
+test('PRICING_UPDATED_AT is a well-formed YYYY-MM-DD date', () => {
+  assert.match(PRICING_UPDATED_AT, /^\d{4}-\d{2}-\d{2}$/);
+  assert.ok(!Number.isNaN(Date.parse(PRICING_UPDATED_AT)));
 });
 
 // ── .gitignore support + glob matching ─────────────────────────────────────────

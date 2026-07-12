@@ -90,6 +90,8 @@ export declare const DEFAULT_MAX_BYTES: number;
 export declare const MODELS: Model[];
 export declare const SUMMARY_MODELS: Model[];
 export declare const TOKEN_FACTOR: Record<'Anthropic' | 'OpenAI' | 'Google', number>;
+/** 'YYYY-MM-DD' the prices in MODELS were last verified against provider docs. */
+export declare const PRICING_UPDATED_AT: string;
 
 export interface DistillCandidate {
   file: string;

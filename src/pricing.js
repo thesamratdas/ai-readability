@@ -11,7 +11,10 @@ export function effectiveTokens(tokens, model) {
   return Math.round(tokens * (model?.tokenFactor ?? 1));
 }
 
-// prices as of 2026-06, illustrative — verify at provider docs before billing
+// Bump this whenever RAW_MODELS prices are updated, so the CLI can surface
+// how stale the figures might be instead of silently drifting from reality.
+export const PRICING_UPDATED_AT = '2026-06-28';
+
 const RAW_MODELS = [
   // Anthropic — platform.claude.com
   { name: 'Claude Opus 4.8',   provider: 'Anthropic', ctx: 1_000_000, usdPerMTok:  5.000 },

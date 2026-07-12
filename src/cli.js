@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { isGenerated, gradeOf, loadIgnore, loadGitignore, GEN_DIRS, reasonFor, computePatterns, writeAiignore, writeToolIgnore, SUPPORTED_TOOLS, createScanCache } from './core.js';
-import { MODELS, SUMMARY_MODELS, effectiveTokens } from './pricing.js';
+import { MODELS, SUMMARY_MODELS, effectiveTokens, PRICING_UPDATED_AT } from './pricing.js';
 import { makeBadge } from './badge.js';
 import { distillRepo, writeSummaries } from './distill.js';
 import fs   from 'node:fs';
@@ -259,7 +259,7 @@ function costTable(tokens, heading) {
       `${usagePct.padStart(4)}%   ${dollar(cost)}   ${fitsStr}`
     );
   }
-  console.log(kleur.dim('\n  * Prices from src/pricing.js — verify at provider docs.'));
+  console.log(kleur.dim(`\n  * Pricing as of ${PRICING_UPDATED_AT}, estimates — verify at provider docs.`));
   console.log(kleur.dim('  * Claude/Gemini token & cost figures are cross-tokenizer estimates.'));
 }
 
@@ -315,6 +315,7 @@ function render() {
 
   // ── context fit (lead with token budget / cost, per positioning) ────────────
   contextFit(total);
+  console.log(kleur.dim(`    pricing as of ${PRICING_UPDATED_AT}, estimates`));
   if (showCost) costTable(total, '💰 Cost to send this repo to an AI');
   console.log();
 

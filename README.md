@@ -131,7 +131,7 @@ Add custom patterns via `.aiignore`.
 
 ## .aiignore
 
-Create `.aiignore` in your project root (same syntax as `.gitignore`) to exclude paths from the scan:
+Create `.aiignore` in your project root (same syntax as `.gitignore`) to exclude paths from the scan. Note: `!` negation (re-including a path under an excluded directory) is not supported — negated lines are ignored, which errs toward scanning more rather than silently hiding files.
 
 ```
 # .aiignore

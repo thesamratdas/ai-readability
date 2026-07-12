@@ -1,3 +1,3 @@
 export { scoreText, scoreRepo, scoreRepoAsync, isGenerated, gradeOf, walk, loadIgnore, loadGitignore, isTextFile, GEN_DIRS, DEFAULT_MAX_BYTES, reasonFor, computePatterns, writeAiignore, writeToolIgnore, SUPPORTED_TOOLS, createScanCache } from './core.js';
-export { MODELS, SUMMARY_MODELS, TOKEN_FACTOR, effectiveTokens } from './pricing.js';
+export { MODELS, SUMMARY_MODELS, TOKEN_FACTOR, effectiveTokens, PRICING_UPDATED_AT } from './pricing.js';
 export { distillRepo, buildImportGraph, extractSkeleton, writeSummaries, makeCandidate, renderSummary } from './distill.js';
