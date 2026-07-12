@@ -70,8 +70,12 @@ export declare function loadGitignore(root: string): string[];
 export declare function reasonFor(r: FileResult, total: number): string | null;
 export declare function computePatterns(files: FileResult[], total: number): string[];
 export declare function writeAiignore(dest: string, patterns: string[]): number;
+/** Writes patterns into a detected tool's ignore file (e.g. .cursorignore).
+ * Returns 0 without writing anything if the tool isn't detected in `root`. */
+export declare function writeToolIgnore(root: string, tool: string, patterns: string[]): number;
 export declare function effectiveTokens(tokens: number, model: Model): number;
 export declare const GEN_DIRS: Set<string>;
+export declare const SUPPORTED_TOOLS: string[];
 export declare const DEFAULT_MAX_BYTES: number;
 export declare const MODELS: Model[];
 export declare const SUMMARY_MODELS: Model[];

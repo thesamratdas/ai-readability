@@ -235,6 +235,29 @@ export function writeAiignore(dest, patterns) {
   return toAdd.length;
 }
 
+// No AI tool reads .aiignore natively, so this is where --fix delivers value
+// beyond .aiignore itself. A tool is "detected" if its config dir exists, or
+// its ignore file already exists (the user is already maintaining one) — we
+// never create a tool's ignore file out of nowhere for a tool that isn't in use.
+export const SUPPORTED_TOOLS = ['cursor', 'codeium'];
+const TOOL_IGNORE = {
+  cursor:  { configDir: '.cursor',  file: '.cursorignore' },
+  codeium: { configDir: '.codeium', file: '.codeiumignore' },
+};
+
+// Writes patterns into a detected tool's ignore file. Returns 0 without
+// writing anything if the tool isn't detected in `root`. Reuses
+// writeAiignore's append-dedup logic, so already-present patterns are
+// never duplicated.
+export function writeToolIgnore(root, tool, patterns) {
+  const cfg = TOOL_IGNORE[tool];
+  if (!cfg) return 0;
+  const dest = path.join(root, cfg.file);
+  const detected = fs.existsSync(path.join(root, cfg.configDir)) || fs.existsSync(dest);
+  if (!detected) return 0;
+  return writeAiignore(dest, patterns);
+}
+
 export function scoreRepo(dir, { ignorePatterns = [], respectGitignore = false, maxBytes = DEFAULT_MAX_BYTES } = {}) {
   const ignore = [
     ...loadIgnore(dir),

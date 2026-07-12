@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { scoreText, isGenerated, isTextFile, gradeOf, scoreRepo, scoreRepoAsync, reasonFor, computePatterns, writeAiignore, walk } from '../src/core.js';
+import { scoreText, isGenerated, isTextFile, gradeOf, scoreRepo, scoreRepoAsync, reasonFor, computePatterns, writeAiignore, writeToolIgnore, walk } from '../src/core.js';
 import { MODELS, effectiveTokens, TOKEN_FACTOR } from '../src/pricing.js';
 import { extractSkeleton, buildImportGraph, distillRepo, writeSummaries } from '../src/distill.js';
 
@@ -286,6 +286,70 @@ test('writeAiignore: deduplicates and never inserts blank lines', () => {
 
     const content = fs.readFileSync(dest, 'utf8');
     assert.equal(content, 'dist/\nbuild/\n', 'no blank line between existing and new pattern');
+  } finally {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  }
+});
+
+// ── writeToolIgnore (multi-tool sync) ──────────────────────────────────────────
+
+test('writeToolIgnore: never writes when the tool is not detected', () => {
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ai-readability-tool-none-'));
+  try {
+    const added = writeToolIgnore(tmpDir, 'cursor', ['dist/']);
+    assert.equal(added, 0, 'undetected tool must not be written to');
+    assert.equal(fs.existsSync(path.join(tmpDir, '.cursorignore')), false, 'file must not be created');
+  } finally {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  }
+});
+
+test('writeToolIgnore: writes when detected via the tool\'s config directory', () => {
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ai-readability-tool-dir-'));
+  try {
+    fs.mkdirSync(path.join(tmpDir, '.cursor'));
+    const added = writeToolIgnore(tmpDir, 'cursor', ['dist/', 'build/']);
+    assert.equal(added, 2);
+    assert.equal(fs.readFileSync(path.join(tmpDir, '.cursorignore'), 'utf8'), 'dist/\nbuild/\n');
+  } finally {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  }
+});
+
+test('writeToolIgnore: writes when detected via an existing ignore file', () => {
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ai-readability-tool-file-'));
+  try {
+    fs.writeFileSync(path.join(tmpDir, '.codeiumignore'), 'node_modules/\n');
+    const added = writeToolIgnore(tmpDir, 'codeium', ['node_modules/', 'dist/']);
+    assert.equal(added, 1, 'only the new pattern should be added');
+    assert.equal(fs.readFileSync(path.join(tmpDir, '.codeiumignore'), 'utf8'), 'node_modules/\ndist/\n');
+  } finally {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  }
+});
+
+test('writeToolIgnore: second run adds zero and never duplicates patterns', () => {
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ai-readability-tool-dedup-'));
+  try {
+    fs.mkdirSync(path.join(tmpDir, '.cursor'));
+    const patterns = ['dist/', 'build/'];
+    const added1 = writeToolIgnore(tmpDir, 'cursor', patterns);
+    assert.equal(added1, 2);
+    const content1 = fs.readFileSync(path.join(tmpDir, '.cursorignore'), 'utf8');
+
+    const added2 = writeToolIgnore(tmpDir, 'cursor', patterns);
+    assert.equal(added2, 0, 'second run must add nothing');
+    assert.equal(fs.readFileSync(path.join(tmpDir, '.cursorignore'), 'utf8'), content1);
+  } finally {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  }
+});
+
+test('writeToolIgnore: unknown tool name is a no-op', () => {
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ai-readability-tool-unknown-'));
+  try {
+    const added = writeToolIgnore(tmpDir, 'not-a-real-tool', ['dist/']);
+    assert.equal(added, 0);
   } finally {
     fs.rmSync(tmpDir, { recursive: true, force: true });
   }

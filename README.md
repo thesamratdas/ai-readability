@@ -84,7 +84,7 @@ ai-readability /path/to/any/project
 | Flag | Description |
 |---|---|
 | `--cost` | Full per-model cost and context window table (14 models, 3 providers) |
-| `--fix` | Auto-write suggested exclusion patterns to `.aiignore` |
+| `--fix` | Auto-write suggested exclusion patterns to `.aiignore` (also syncs `.cursorignore` / `.codeiumignore` if that tool is detected — no AI tool reads `.aiignore` natively) |
 | `--json` | Structured JSON output — for CI pipelines or `jq` |
 | `--respect-gitignore` | Also exclude files matched by the root `.gitignore` (models what a `.gitignore`-aware AI tool actually ingests) |
 | `--watch` | Re-scan and refresh automatically on every file change |

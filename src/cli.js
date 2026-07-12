@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { scoreText, isGenerated, walk, gradeOf, loadIgnore, loadGitignore, GEN_DIRS, reasonFor, computePatterns, writeAiignore } from './core.js';
+import { scoreText, isGenerated, walk, gradeOf, loadIgnore, loadGitignore, GEN_DIRS, reasonFor, computePatterns, writeAiignore, writeToolIgnore, SUPPORTED_TOOLS } from './core.js';
 import { MODELS, SUMMARY_MODELS, effectiveTokens } from './pricing.js';
 import { makeBadge } from './badge.js';
 import { distillRepo, writeSummaries } from './distill.js';
@@ -368,6 +368,14 @@ function render() {
         console.log('\n  ' + kleur.green(`✅  Wrote ${added} pattern(s) to .aiignore`));
       } else {
         console.log('\n  ' + kleur.dim('Nothing to update — already optimized.'));
+      }
+      // No AI tool reads .aiignore natively — sync the same patterns into any
+      // detected tool's own ignore file (only tools actually in use in root).
+      for (const tool of SUPPORTED_TOOLS) {
+        const toolAdded = writeToolIgnore(root, tool, patterns);
+        if (toolAdded) {
+          console.log('  ' + kleur.green(`✅  Wrote ${toolAdded} pattern(s) to .${tool}ignore`));
+        }
       }
     } else {
       console.log('\n  ' + kleur.dim('Tip: run with --fix to write .aiignore automatically.'));
