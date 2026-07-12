@@ -80,14 +80,33 @@ function globToRegex(glob) {
   for (let i = 0; i < glob.length; i++) {
     const c = glob[i];
     if (c === '*') {
-      if (glob[i + 1] === '*') { re += '.*'; i++; }
-      else re += '[^/]*';
+      if (glob[i + 1] === '*') {
+        i++;
+        if (glob[i + 1] === '/') {
+          // **/ → zero-or-more directory prefix (matches root-level files too)
+          re += '(?:.*/)?';
+          i++;
+        } else {
+          re += '.*';
+        }
+      } else re += '[^/]*';
     } else if (c === '?') {
       re += '[^/]';
     } else {
       re += c.replace(/[.+^${}()|[\]\\]/g, '\\$&');
     }
   }
+  return re;
+}
+
+// Compiled-regex cache keyed by the raw pattern string — avoids re-compiling
+// the same RegExp thousands of times across a 500-file scan.
+const _globReCache = new Map();
+function cachedGlobRe(p, dirOnly) {
+  const key = p + (dirOnly ? '/' : '');
+  if (_globReCache.has(key)) return _globReCache.get(key);
+  const re = new RegExp('^' + globToRegex(p) + (dirOnly ? '(?:/.*)?$' : '$'));
+  _globReCache.set(key, re);
   return re;
 }
 
@@ -120,7 +139,7 @@ function matchIgnore(rel, patterns) {
       continue;
     }
 
-    const re = new RegExp('^' + globToRegex(p) + (dirOnly ? '(?:/.*)?$' : '$'));
+    const re = cachedGlobRe(p, dirOnly);
     if (anchored || hasSlash) {
       if (re.test(norm)) return true;
     } else {
@@ -164,17 +183,18 @@ export function isTextFile(name) {
   return TEXT.has(path.extname(name).toLowerCase()) || TEXT_NAMES.has(name);
 }
 
-export function walk(dir, ignore = [], out = [], _root, maxBytes = DEFAULT_MAX_BYTES) {
+export function walk(dir, ignore = [], out = [], _root, maxBytes = DEFAULT_MAX_BYTES, skipped = []) {
   const root = _root ?? dir;
   for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
     const p   = path.join(dir, e.name);
     const rel = path.relative(root, p);
     if (matchIgnore(rel, ignore)) continue;
     if (e.isDirectory()) {
-      if (!SKIP.has(e.name)) walk(p, ignore, out, root, maxBytes);
+      if (!SKIP.has(e.name)) walk(p, ignore, out, root, maxBytes, skipped);
     } else if (isTextFile(e.name)) {
       try {
         if (fs.statSync(p).size <= maxBytes) out.push(p);
+        else skipped.push(rel);
       } catch { /* unreadable / vanished file — skip */ }
     }
   }
@@ -221,9 +241,10 @@ export function scoreRepo(dir, { ignorePatterns = [], respectGitignore = false, 
     ...(respectGitignore ? loadGitignore(dir) : []),
     ...ignorePatterns,
   ];
-  const files  = walk(dir, ignore, [], undefined, maxBytes);
+  const skipped = [];
+  const files  = walk(dir, ignore, [], undefined, maxBytes, skipped);
   if (!files.length) {
-    return { root: dir, scannedAt: new Date().toISOString(), total: 0, score: 0, grade: 'F', files: [] };
+    return { root: dir, scannedAt: new Date().toISOString(), total: 0, score: 0, grade: 'F', files: [], skippedFiles: skipped.length };
   }
   const rows = files.map(f => {
     const rel = path.relative(dir, f);
@@ -241,5 +262,6 @@ export function scoreRepo(dir, { ignorePatterns = [], respectGitignore = false, 
     score,
     grade: gradeOf(score),
     files: rows.sort((a, b) => b.waste - a.waste),
+    skippedFiles: skipped.length,
   };
 }
