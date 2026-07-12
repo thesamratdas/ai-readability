@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { scoreText, isGenerated, walk, gradeOf, loadIgnore, loadGitignore, GEN_DIRS, reasonFor, computePatterns, writeAiignore, writeToolIgnore, SUPPORTED_TOOLS } from './core.js';
+import { isGenerated, gradeOf, loadIgnore, loadGitignore, GEN_DIRS, reasonFor, computePatterns, writeAiignore, writeToolIgnore, SUPPORTED_TOOLS, createScanCache } from './core.js';
 import { MODELS, SUMMARY_MODELS, effectiveTokens } from './pricing.js';
 import { makeBadge } from './badge.js';
 import { distillRepo, writeSummaries } from './distill.js';
@@ -221,13 +221,15 @@ function contextFit(tokens, label) {
 }
 
 // ── scan ──────────────────────────────────────────────────────────────────────
+// Cached across calls so --watch doesn't retokenize the whole repo on every
+// save; a one-shot run just misses the (empty) cache once, so this costs
+// nothing outside watch mode. createScanCache self-invalidates whenever
+// .aiignore/.gitignore change, since that can change which files are in scope.
+const scanCache = createScanCache();
+
 function scan() {
   const ignore = [...loadIgnore(root), ...(respectGi ? loadGitignore(root) : [])];
-  return walk(root, ignore).map(f => {
-    const rel = path.relative(root, f);
-    const s   = scoreText(fs.readFileSync(f, 'utf8'));
-    return { file: rel, ...s, waste: s.tokens * (1 - s.value / 100) };
-  });
+  return scanCache.scan(root, ignore);
 }
 
 // ── cost table ────────────────────────────────────────────────────────────────

@@ -87,7 +87,7 @@ ai-readability /path/to/any/project
 | `--fix` | Auto-write suggested exclusion patterns to `.aiignore` (also syncs `.cursorignore` / `.codeiumignore` if that tool is detected — no AI tool reads `.aiignore` natively) |
 | `--json` | Structured JSON output — for CI pipelines or `jq` |
 | `--respect-gitignore` | Also exclude files matched by the root `.gitignore` (models what a `.gitignore`-aware AI tool actually ingests) |
-| `--watch` | Re-scan and refresh automatically on every file change |
+| `--watch` | Re-scan and refresh automatically on every file change (only rescores files whose mtime changed; edits to `.aiignore`/`.gitignore` trigger a full rescan) |
 | `--top <N>` | Show top N files in the bar chart [default: 10] |
 | `--badge [file]` | Write an SVG grade badge [default: `<dir>/ai-readability-badge.svg`] |
 | `--fail-under <N>` | Exit with code 1 if the repo score is below `N` — for CI gates; works with `--json` too |

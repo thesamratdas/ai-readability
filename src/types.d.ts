@@ -20,6 +20,14 @@ export interface RepoResult {
   skippedFiles: number;
 }
 
+export interface ScanCache {
+  /** Rescores dir, reusing cached per-file results when a file's mtime hasn't changed. */
+  scan(dir: string, ignore?: string[], maxBytes?: number): FileResult[];
+  /** Drops all cached entries, forcing every file to be rescored on the next scan. */
+  invalidate(): void;
+  size(): number;
+}
+
 export interface ScoreResult {
   grade: 'A' | 'B' | 'C' | 'D' | 'F';
   value: number;
@@ -73,6 +81,8 @@ export declare function writeAiignore(dest: string, patterns: string[]): number;
 /** Writes patterns into a detected tool's ignore file (e.g. .cursorignore).
  * Returns 0 without writing anything if the tool isn't detected in `root`. */
 export declare function writeToolIgnore(root: string, tool: string, patterns: string[]): number;
+/** Creates a repeated-scan mtime cache — see ScanCache. Used by the CLI's --watch mode. */
+export declare function createScanCache(): ScanCache;
 export declare function effectiveTokens(tokens: number, model: Model): number;
 export declare const GEN_DIRS: Set<string>;
 export declare const SUPPORTED_TOOLS: string[];

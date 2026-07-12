@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { scoreText, isGenerated, isTextFile, gradeOf, scoreRepo, scoreRepoAsync, reasonFor, computePatterns, writeAiignore, writeToolIgnore, walk } from '../src/core.js';
+import { scoreText, isGenerated, isTextFile, gradeOf, scoreRepo, scoreRepoAsync, reasonFor, computePatterns, writeAiignore, writeToolIgnore, walk, createScanCache } from '../src/core.js';
 import { MODELS, effectiveTokens, TOKEN_FACTOR } from '../src/pricing.js';
 import { extractSkeleton, buildImportGraph, distillRepo, writeSummaries } from '../src/distill.js';
 
@@ -350,6 +350,76 @@ test('writeToolIgnore: unknown tool name is a no-op', () => {
   try {
     const added = writeToolIgnore(tmpDir, 'not-a-real-tool', ['dist/']);
     assert.equal(added, 0);
+  } finally {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  }
+});
+
+// ── createScanCache (--watch mtime cache) ──────────────────────────────────────
+
+test('createScanCache: reuses the cached score while mtime is unchanged, rescans after invalidate()', () => {
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ai-readability-cache-'));
+  try {
+    const filePath   = path.join(tmpDir, 'a.js');
+    const fixedTime  = new Date('2024-01-01T00:00:00.000Z');
+    fs.writeFileSync(filePath, 'export const a = 1;\n');
+    fs.utimesSync(filePath, fixedTime, fixedTime);
+
+    const cache = createScanCache();
+    const [row1] = cache.scan(tmpDir);
+
+    // Content changes, but mtime is forced back to the exact same instant —
+    // this proves the cache is keying on mtime, not content.
+    fs.writeFileSync(filePath, 'x'.repeat(3000));
+    fs.utimesSync(filePath, fixedTime, fixedTime);
+
+    const [row2] = cache.scan(tmpDir);
+    assert.strictEqual(row2.tokens, row1.tokens, 'unchanged mtime must reuse the cached (stale) score');
+
+    cache.invalidate();
+    const [row3] = cache.scan(tmpDir);
+    assert.notStrictEqual(row3.tokens, row1.tokens, 'invalidate() must force a full rescan reflecting the new content');
+  } finally {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  }
+});
+
+test('createScanCache: touching .aiignore invalidates the cache automatically', () => {
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ai-readability-cache-ignore-'));
+  try {
+    const filePath  = path.join(tmpDir, 'a.js');
+    const fixedTime = new Date('2024-01-01T00:00:00.000Z');
+    fs.writeFileSync(filePath, 'export const a = 1;\n');
+    fs.utimesSync(filePath, fixedTime, fixedTime);
+
+    const cache = createScanCache();
+    const [row1] = cache.scan(tmpDir);
+
+    // a.js's own mtime is unchanged, but creating .aiignore must still force
+    // a full rescan — not just of files whose ignore status changed.
+    fs.writeFileSync(filePath, 'x'.repeat(3000));
+    fs.utimesSync(filePath, fixedTime, fixedTime);
+    fs.writeFileSync(path.join(tmpDir, '.aiignore'), '# no-op\n');
+
+    const [row2] = cache.scan(tmpDir);
+    assert.notStrictEqual(row2.tokens, row1.tokens, 'creating/touching .aiignore must trigger a full rescan');
+  } finally {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  }
+});
+
+test('createScanCache: prunes entries for files that no longer exist', () => {
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ai-readability-cache-prune-'));
+  try {
+    fs.writeFileSync(path.join(tmpDir, 'a.js'), 'export const a = 1;\n');
+    fs.writeFileSync(path.join(tmpDir, 'b.js'), 'export const b = 2;\n');
+    const cache = createScanCache();
+    cache.scan(tmpDir);
+    assert.strictEqual(cache.size(), 2);
+
+    fs.rmSync(path.join(tmpDir, 'b.js'));
+    cache.scan(tmpDir);
+    assert.strictEqual(cache.size(), 1, 'stale entry for the deleted file must be pruned');
   } finally {
     fs.rmSync(tmpDir, { recursive: true, force: true });
   }

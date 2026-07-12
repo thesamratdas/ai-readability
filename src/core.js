@@ -337,3 +337,47 @@ export async function scoreRepoAsync(dir, { ignorePatterns = [], respectGitignor
     skippedFiles: skipped.length,
   };
 }
+
+function ignoreConfigSignature(dir) {
+  const aiM = fs.existsSync(path.join(dir, '.aiignore'))  ? fs.statSync(path.join(dir, '.aiignore')).mtimeMs  : 0;
+  const giM = fs.existsSync(path.join(dir, '.gitignore')) ? fs.statSync(path.join(dir, '.gitignore')).mtimeMs : 0;
+  return `${dir}|${aiM}|${giM}`;
+}
+
+// Repeated-scan cache keyed by absolute file path, for hosts that rescan the
+// same directory over and over (e.g. --watch, which otherwise retokenizes
+// every file on every save). A file is only rescored when its mtime changes.
+// The whole cache self-invalidates whenever .aiignore's or .gitignore's own
+// mtime changes, since editing either can change which files are in scope —
+// simpler and safer than reasoning about which entries are still valid.
+// invalidate() clears it manually; stale entries for files walk() no longer
+// sees are pruned each scan so long watch sessions don't leak memory.
+export function createScanCache() {
+  const cache = new Map(); // absPath -> { mtimeMs, row }
+  let ignoreSig = null;
+  return {
+    scan(dir, ignore = [], maxBytes = DEFAULT_MAX_BYTES) {
+      const sig = ignoreConfigSignature(dir);
+      if (sig !== ignoreSig) {
+        cache.clear();
+        ignoreSig = sig;
+      }
+      const files = walk(dir, ignore, [], undefined, maxBytes);
+      const seen  = new Set(files);
+      const rows  = files.map(f => {
+        const mtimeMs = fs.statSync(f).mtimeMs;
+        const cached  = cache.get(f);
+        if (cached && cached.mtimeMs === mtimeMs) return cached.row;
+        const rel = path.relative(dir, f);
+        const s   = scoreText(fs.readFileSync(f, 'utf8'));
+        const row = { file: rel, ...s, waste: s.tokens * (1 - s.value / 100) };
+        cache.set(f, { mtimeMs, row });
+        return row;
+      });
+      for (const key of cache.keys()) if (!seen.has(key)) cache.delete(key);
+      return rows;
+    },
+    invalidate() { cache.clear(); ignoreSig = null; },
+    size() { return cache.size; },
+  };
+}
