@@ -14,8 +14,10 @@ export interface RepoResult {
   scannedAt: string;
   total: number;
   score: number;
-  grade: 'A' | 'B' | 'C' | 'D' | 'F';
+  /** 'N/A' when the repo has zero scannable text files. */
+  grade: 'A' | 'B' | 'C' | 'D' | 'F' | 'N/A';
   files: FileResult[];
+  skippedFiles: number;
 }
 
 export interface ScoreResult {

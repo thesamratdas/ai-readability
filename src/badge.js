@@ -8,8 +8,8 @@ const GRADE_COLOR = {
 
 export function makeBadge(grade, score) {
   const color = GRADE_COLOR[grade] ?? '#9f9f9f';
-  // Label "AI-Readability" (~14 chars) + value "A" (1 char)
-  const lw = 112, vw = 28, w = lw + vw;
+  // Label "AI-Readability" (~14 chars) + value ("A"-"F": 1 char, fits 28px; "N/A": needs more room)
+  const lw = 112, vw = grade.length > 1 ? grade.length * 6 + 20 : 28, w = lw + vw;
   const lx = Math.floor(lw / 2);
   const vx = lw + Math.floor(vw / 2);
   return [

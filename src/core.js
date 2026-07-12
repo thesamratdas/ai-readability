@@ -244,7 +244,7 @@ export function scoreRepo(dir, { ignorePatterns = [], respectGitignore = false, 
   const skipped = [];
   const files  = walk(dir, ignore, [], undefined, maxBytes, skipped);
   if (!files.length) {
-    return { root: dir, scannedAt: new Date().toISOString(), total: 0, score: 0, grade: 'F', files: [], skippedFiles: skipped.length };
+    return { root: dir, scannedAt: new Date().toISOString(), total: 0, score: 0, grade: 'N/A', files: [], skippedFiles: skipped.length };
   }
   const rows = files.map(f => {
     const rel = path.relative(dir, f);

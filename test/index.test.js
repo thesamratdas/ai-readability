@@ -138,6 +138,20 @@ test('scoreRepo on its own src/ returns a valid result object', () => {
   assert.ok(result.scannedAt,                   'scannedAt is set');
 });
 
+test('scoreRepo on an empty repo returns grade N/A, not F', () => {
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ai-readability-empty-'));
+  try {
+    const result = scoreRepo(tmpDir);
+    assert.strictEqual(result.grade, 'N/A');
+    assert.strictEqual(result.total, 0);
+    assert.strictEqual(result.score, 0);
+    assert.deepStrictEqual(result.files, []);
+    assert.strictEqual(result.skippedFiles, 0);
+  } finally {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  }
+});
+
 // ── reasonFor grade guard ─────────────────────────────────────────────────────
 
 test('reasonFor: A-grade file is never flagged as token-hog', () => {
