@@ -310,13 +310,10 @@ function render() {
   // ── header ─────────────────────────────────────────────────────────────────
   console.log('\n' + kleur.bold(`  📦 ${root}`));
   console.log('  ' + rule);
-  console.log(
-    `\n  Grade ${gc(repoGrade, kleur.bold(repoGrade))}  ·  ` +
-    `${kleur.bold(fmt(total))} tokens  ·  Score ${repoVal}/100  ·  ${rows.length} files\n`
-  );
 
-  // ── context fit ────────────────────────────────────────────────────────────
+  // ── context fit (lead with token budget / cost, per positioning) ────────────
   contextFit(total);
+  if (showCost) costTable(total, '💰 Cost to send this repo to an AI');
   console.log();
 
   // ── bar chart ──────────────────────────────────────────────────────────────
@@ -335,72 +332,71 @@ function render() {
 
   // ── flagged files ──────────────────────────────────────────────────────────
   const flagged = rows.map(r => ({ ...r, reason: reasonFor(r, total) })).filter(r => r.reason);
+  let keptRaw = total;
 
   if (!flagged.length) {
     console.log('\n  ' + kleur.green('✅  No noise detected — this repo is clean for AI context.'));
-    if (showCost) costTable(total, '💰 Cost to send this repo to an AI');
-    if (resolvedBadge) {
-      fs.writeFileSync(resolvedBadge, makeBadge(repoGrade, repoVal));
-      console.log('\n  ' + kleur.green(`✅  Badge → ${resolvedBadge}`));
-    }
-    console.log();
-    return repoVal;
-  }
-
-  const kept     = rows.filter(r => !flagged.some(f => f.file === r.file));
-  const keptRaw  = kept.reduce((a, r) => a + r.tokens, 0);
-  const keptSafe = keptRaw || 1;
-  const keptVal  = Math.round(kept.reduce((a, r) => a + r.value * r.tokens, 0) / keptSafe);
-  const saved    = total - keptRaw;
-
-  console.log();
-  console.log(
-    `  💡 Exclude ${kleur.bold(flagged.length)} file(s)  ` +
-    `${gc(repoGrade)} → ${gc(gradeOf(keptVal))}  ·  ` +
-    `save ${kleur.bold(fmt(saved))} tokens (${Math.round(saved / total * 100)}%)`
-  );
-  console.log();
-
-  flagged.sort((a, b) => b.tokens - a.tokens).forEach(r => {
-    const tag = `[${r.reason}]`.padEnd(20);
-    console.log(`    ${kleur.dim(tag)}  ${String(r.tokens).padStart(7)} tok  ${r.file}`);
-  });
-
-  const patterns = computePatterns(rows, total);
-
-  console.log('\n  ' + kleur.bold('📋 Paste into .aiignore / .cursorignore:'));
-  patterns.forEach(p => console.log('    ' + kleur.green(p)));
-
-  if (doFix) {
-    const dest  = path.join(root, '.aiignore');
-    const added = writeAiignore(dest, patterns);
-    if (added) {
-      console.log('\n  ' + kleur.green(`✅  Wrote ${added} pattern(s) to .aiignore`));
-    } else {
-      console.log('\n  ' + kleur.dim('Nothing to update — already optimized.'));
-    }
   } else {
-    console.log('\n  ' + kleur.dim('Tip: run with --fix to write .aiignore automatically.'));
-  }
+    const kept     = rows.filter(r => !flagged.some(f => f.file === r.file));
+    keptRaw        = kept.reduce((a, r) => a + r.tokens, 0);
+    const keptSafe = keptRaw || 1;
+    const keptVal  = Math.round(kept.reduce((a, r) => a + r.value * r.tokens, 0) / keptSafe);
+    const saved    = total - keptRaw;
 
-  // ── after-exclusion context fit ────────────────────────────────────────────
-  if (keptRaw > 0 && keptRaw !== total) {
-    contextFit(keptRaw, 'After exclusions');
-  }
+    console.log();
+    console.log(
+      `  💡 Exclude ${kleur.bold(flagged.length)} file(s)  ` +
+      `${gc(repoGrade)} → ${gc(gradeOf(keptVal))}  ·  ` +
+      `save ${kleur.bold(fmt(saved))} tokens (${Math.round(saved / total * 100)}%)`
+    );
+    console.log();
 
-  // ── cost table ─────────────────────────────────────────────────────────────
-  if (showCost) {
-    costTable(total, '💰 Cost to send this repo to an AI');
+    flagged.sort((a, b) => b.tokens - a.tokens).forEach(r => {
+      const tag = `[${r.reason}]`.padEnd(20);
+      console.log(`    ${kleur.dim(tag)}  ${String(r.tokens).padStart(7)} tok  ${r.file}`);
+    });
+
+    const patterns = computePatterns(rows, total);
+
+    console.log('\n  ' + kleur.bold('📋 Paste into .aiignore / .cursorignore:'));
+    patterns.forEach(p => console.log('    ' + kleur.green(p)));
+
+    if (doFix) {
+      const dest  = path.join(root, '.aiignore');
+      const added = writeAiignore(dest, patterns);
+      if (added) {
+        console.log('\n  ' + kleur.green(`✅  Wrote ${added} pattern(s) to .aiignore`));
+      } else {
+        console.log('\n  ' + kleur.dim('Nothing to update — already optimized.'));
+      }
+    } else {
+      console.log('\n  ' + kleur.dim('Tip: run with --fix to write .aiignore automatically.'));
+    }
+
+    // ── after-exclusion context fit / cost ──────────────────────────────────
     if (keptRaw > 0 && keptRaw !== total) {
-      costTable(keptRaw, `💰 After applying exclusions  (${fmt(keptRaw)} tokens)`);
+      contextFit(keptRaw, 'After exclusions');
+      if (showCost) costTable(keptRaw, `💰 After applying exclusions  (${fmt(keptRaw)} tokens)`);
     }
   }
 
-  // ── badge ──────────────────────────────────────────────────────────────────
+  // ── badge (SVG file, only when --badge is passed) ───────────────────────────
   if (resolvedBadge) {
     fs.writeFileSync(resolvedBadge, makeBadge(repoGrade, repoVal));
     console.log('\n  ' + kleur.green(`✅  Badge → ${resolvedBadge}`));
   }
+
+  // ── grade footer (compact — secondary to context-fit/cost) ─────────────────
+  console.log(
+    `\n  Grade ${gc(repoGrade, kleur.bold(repoGrade))}  ·  Score ${repoVal}/100  ·  ` +
+    `${rows.length} files  ·  ${kleur.bold(fmt(total))} tokens`
+  );
+
+  // ── badge markdown (every run — the shareable, viral artifact) ──────────────
+  const badgeFile = resolvedBadge ?? path.resolve(root, 'ai-readability-badge.svg');
+  const badgeRel  = path.relative(root, badgeFile).replace(/\\/g, '/') || 'ai-readability-badge.svg';
+  console.log('\n  ' + kleur.dim('📋 Badge markdown (paste into your README):'));
+  console.log('  ' + kleur.green(`![AI-Readability](./${badgeRel})`));
 
   console.log();
   return repoVal;
