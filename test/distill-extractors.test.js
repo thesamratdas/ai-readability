@@ -46,3 +46,35 @@ test('extractSkeleton (Python): handles async def and keeps its docstring', () =
   assert.doesNotMatch(skeleton, /last_error/, 'body statement dropped');
   assert.doesNotMatch(skeleton, /for _ in range/, 'body statement dropped');
 });
+
+// ── Go ──────────────────────────────────────────────────────────────────────
+
+test('extractSkeleton (Go): keeps doc comments, struct fields, interface methods, and func signatures', () => {
+  const skeleton = extractSkeleton(read('go', 'server.go'), '.go');
+
+  assert.match(skeleton, /\/\/ Widget represents a single item in the catalog\./);
+  assert.match(skeleton, /type Widget struct \{/);
+  assert.match(skeleton, /ID\s+string/, 'struct field kept');
+  assert.match(skeleton, /type Store interface \{/);
+  assert.match(skeleton, /Get\(id string\) \(\*Widget, error\)/, 'interface method kept');
+  assert.match(skeleton, /func NewServer\(store Store\) \*Server \{ … \}/, 'func signature kept, body dropped');
+  assert.match(skeleton, /func \(s \*Server\) ServeHTTP\(w http\.ResponseWriter, r \*http\.Request\) \{ … \}/, 'method with receiver kept');
+});
+
+test('extractSkeleton (Go): drops func bodies', () => {
+  const skeleton = extractSkeleton(read('go', 'server.go'), '.go');
+
+  assert.doesNotMatch(skeleton, /http\.Error/, 'body statement dropped');
+  assert.doesNotMatch(skeleton, /json\.NewEncoder/, 'body statement dropped');
+  assert.doesNotMatch(skeleton, /price \* 0\.9/, 'body statement dropped');
+});
+
+test('extractSkeleton (Go): handles multiple funcs and a plain (non-receiver) struct type', () => {
+  const skeleton = extractSkeleton(read('go', 'util.go'), '.go');
+
+  assert.match(skeleton, /func Slugify\(text string\) string \{ … \}/);
+  assert.match(skeleton, /type RetryConfig struct \{/);
+  assert.match(skeleton, /Attempts int/);
+  assert.match(skeleton, /func FetchWithRetry\(url string, cfg RetryConfig\) \(string, error\) \{ … \}/);
+  assert.doesNotMatch(skeleton, /lastErr/, 'body statement dropped');
+});
