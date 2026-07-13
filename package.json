@@ -15,7 +15,7 @@
     "ai-readability": "src/cli.js"
   },
   "scripts": {
-    "test": "node --test test/index.test.js test/cli.test.js test/mcp.test.js"
+    "test": "node --test test/index.test.js test/cli.test.js test/mcp.test.js test/distill-extractors.test.js"
   },
   "keywords": [
     "ai",

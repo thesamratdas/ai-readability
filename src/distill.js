@@ -130,8 +130,207 @@ function extractGeneric(text) {
   return out.join('\n').replace(/\n{3,}/g, '\n\n').trim();
 }
 
+// ── Python skeleton extractor ────────────────────────────────────────────────
+// Indentation-based (Python has no braces): keeps decorators, class/def
+// signatures, and any docstring immediately inside a def; drops everything
+// else in a function body by skipping lines more indented than the def.
+// Class bodies are NOT skipped, so nested method defs are found in turn.
+
+function pyIndent(raw) { return raw.match(/^[ \t]*/)[0].length; }
+
+// Emits a (possibly multi-line) triple-quoted string starting at lines[i].
+// Returns the index of its last line.
+function consumePyDocstring(lines, out, i) {
+  const first = lines[i].trim();
+  const quote = first.startsWith('"""') ? '"""' : "'''";
+  out.push(lines[i]);
+  if (first.length > 3 && first.slice(3).includes(quote)) return i; // closes on the same line
+  let k = i + 1;
+  while (k < lines.length && !lines[k].includes(quote)) { out.push(lines[k]); k++; }
+  if (k < lines.length) out.push(lines[k]);
+  return k;
+}
+
+function extractPython(text) {
+  const lines = text.split('\n');
+  const out = [];
+  let pending = [];
+  let skipIndent = null; // while set, drop lines more indented than this (inside a dropped def body)
+
+  const flush = () => { if (pending.length) out.push(...pending); pending = []; };
+
+  for (let i = 0; i < lines.length; i++) {
+    const raw = lines[i];
+    const t = raw.trim();
+    const indent = pyIndent(raw);
+
+    if (skipIndent !== null) {
+      if (t !== '' && indent <= skipIndent) skipIndent = null; // body ended — reprocess this line below
+      else continue;
+    }
+
+    if (!out.length && !pending.length && (t.startsWith('"""') || t.startsWith("'''"))) {
+      i = consumePyDocstring(lines, out, i); // leading module docstring
+      continue;
+    }
+    if (t === '') { pending = []; continue; }
+    if (t.startsWith('#') || t.startsWith('@')) { pending.push(raw); continue; }
+
+    const isDef   = /^(async\s+)?def\s+\w/.test(t);
+    const isClass = /^class\s+\w/.test(t);
+
+    if (isDef || isClass) {
+      flush();
+      out.push(raw.replace(/\s+$/, ''));
+      let j = i + 1;
+      while (j < lines.length && lines[j].trim() === '') j++;
+      const next = lines[j] ? lines[j].trim() : '';
+      if (next.startsWith('"""') || next.startsWith("'''")) i = consumePyDocstring(lines, out, j);
+      if (isDef) skipIndent = indent; // class bodies stay open for nested defs
+    }
+    // any other statement (plain assignment, control flow, ...) is dropped
+  }
+
+  return out.join('\n').replace(/\n{3,}/g, '\n\n').trim();
+}
+
+// ── Go skeleton extractor ────────────────────────────────────────────────────
+// Brace-based like JS/TS: keeps doc comments, func/type/struct/interface
+// signatures; struct/interface bodies are kept (field/method lists are the
+// API), func bodies are dropped.
+
+const GO_TOP_DECL = /^(func\b|type\s+\w+\s+(struct|interface)\b)/;
+const GO_KEEP_KIND = /\btype\s+\w+\s+(struct|interface)\b/;
+
+function extractGo(text) {
+  const lines = text.split('\n');
+  const out = [];
+  let pending = [];
+  let depth = 0;
+  let keepOpen = false;
+
+  const flush = () => { if (pending.length) out.push(...pending); pending = []; };
+
+  for (const raw of lines) {
+    const t = raw.trim();
+    if (t.startsWith('//')) { pending.push(raw); continue; }
+    if (t === '') { pending = []; continue; }
+
+    const before = depth;
+
+    if (before === 0 && GO_TOP_DECL.test(t)) {
+      flush();
+      if (!raw.includes('{') || braceDelta(raw) === 0) {
+        out.push(raw.replace(/\s+$/, ''));
+      } else if (GO_KEEP_KIND.test(t)) {
+        out.push(headUpToBrace(raw) + ' {');
+      } else {
+        out.push(headUpToBrace(raw) + ' { … }');
+      }
+      pending = [];
+    } else if (before === 1 && keepOpen && t === '}') {
+      out.push('}');
+    } else if (before === 1 && keepOpen) {
+      out.push('  ' + t); // struct field / interface method line — Go bodies at this depth are just declarations
+    } else {
+      pending = [];
+    }
+
+    depth += braceDelta(raw);
+    if (depth < 0) depth = 0;
+    if (before === 0 && depth === 1) keepOpen = GO_KEEP_KIND.test(t) && raw.includes('{');
+    else if (depth === 0) keepOpen = false;
+  }
+
+  return out.join('\n').replace(/\n{3,}/g, '\n\n').trim();
+}
+
+// ── Java/Kotlin skeleton extractor ───────────────────────────────────────────
+// Brace-based: keeps doc comments/annotations and class/interface/enum/method
+// signatures (public API only — skips private members like extractJsTs does);
+// class/interface bodies stay open so member signatures are found, method
+// bodies are dropped.
+
+const JAVA_KT_TOP_DECL = /^(@\w|(public|private|protected|internal|abstract|final|static|open|sealed|data|)\s*)*(class|interface|enum|object|fun|record)\b/;
+const JAVA_KT_KEEP_KIND = /\b(class|interface|enum|object)\b/;
+
+function javaKtMemberSig(t) {
+  if (!/^[\w$@]/.test(t)) return null;
+  if (/^private\b/.test(t)) return null; // skip non-public members
+  const bi = t.indexOf('{');
+  const si = t.indexOf(';');
+  if (bi >= 0 && (si < 0 || bi < si)) return headUpToBrace(t) + ' { … }';
+  if (si >= 0) return t.slice(0, si + 1);
+  return null;
+}
+
+function extractJavaKotlin(text) {
+  const lines = text.split('\n');
+  const out = [];
+  let pending = [];
+  let depth = 0;
+  let keepOpen = false;
+  let inBlockComment = false;
+  let blockBuf = [];
+
+  const flush = () => { if (pending.length) out.push(...pending); pending = []; };
+
+  for (const raw of lines) {
+    const t = raw.trim();
+
+    if (inBlockComment) {
+      blockBuf.push(raw);
+      if (t.includes('*/')) { inBlockComment = false; if (blockBuf[0].trim().startsWith('/**')) pending = blockBuf; blockBuf = []; }
+      continue;
+    }
+    if (t.startsWith('/*')) {
+      if (t.includes('*/')) { if (t.startsWith('/**')) pending = [raw]; }
+      else { inBlockComment = true; blockBuf = [raw]; }
+      continue;
+    }
+    if (t.startsWith('//') || t.startsWith('@')) { pending.push(raw); continue; }
+    if (t === '') { pending = []; continue; }
+
+    const before = depth;
+
+    if (before === 0 && JAVA_KT_TOP_DECL.test(t)) {
+      flush();
+      if (!raw.includes('{') || braceDelta(raw) === 0) {
+        out.push(raw.replace(/\s+$/, ''));
+      } else if (JAVA_KT_KEEP_KIND.test(t)) {
+        out.push(headUpToBrace(raw) + ' {');
+      } else {
+        out.push(headUpToBrace(raw) + ' { … }');
+      }
+      pending = [];
+    } else if (before === 1 && keepOpen && t === '}') {
+      out.push('}');
+    } else if (before === 1 && keepOpen) {
+      const sig = javaKtMemberSig(t);
+      if (sig) { flush(); out.push('  ' + sig); } else { pending = []; }
+    } else {
+      pending = [];
+    }
+
+    depth += braceDelta(raw);
+    if (depth < 0) depth = 0;
+    if (before === 0 && depth === 1) keepOpen = JAVA_KT_KEEP_KIND.test(t) && raw.includes('{');
+    else if (depth === 0) keepOpen = false;
+  }
+
+  return out.join('\n').replace(/\n{3,}/g, '\n\n').trim();
+}
+
+const PY_EXT = new Set(['.py', '.pyi']);
+const GO_EXT = new Set(['.go']);
+const JAVA_KT_EXT = new Set(['.java', '.kt', '.kts']);
+
 export function extractSkeleton(text, ext) {
-  return JS_EXT.has(ext) ? extractJsTs(text) : extractGeneric(text);
+  if (JS_EXT.has(ext)) return extractJsTs(text);
+  if (PY_EXT.has(ext)) return extractPython(text);
+  if (GO_EXT.has(ext)) return extractGo(text);
+  if (JAVA_KT_EXT.has(ext)) return extractJavaKotlin(text);
+  return extractGeneric(text);
 }
 
 // ── import graph (fan-in) ────────────────────────────────────────────────────────
