@@ -221,6 +221,27 @@ Skeletons are extracted **offline** (no API keys). Extraction is highest-fidelit
 
 Library API: `import { distillRepo, extractSkeleton, buildImportGraph, writeSummaries } from 'ai-readability'`.
 
+## MCP server
+
+`ai-readability mcp` starts a [Model Context Protocol](https://modelcontextprotocol.io) server on stdio, so an MCP-aware AI client (Claude Desktop, Cursor, etc.) can query your repo directly instead of you pasting output in by hand.
+
+```bash
+npm install @modelcontextprotocol/sdk zod   # optional deps, only needed for this command
+npx ai-readability mcp
+```
+
+`@modelcontextprotocol/sdk` and `zod` are **optional dependencies** — a normal scan never needs them, and the `mcp` command prints an install hint if they're missing. This command needs Node ≥ 18 (the SDK's own requirement), even though the rest of the CLI supports Node ≥ 16.
+
+Every tool returns a single MCP text content item whose `text` is a JSON string in the shape documented below — treat these as a **stable public API**.
+
+| Tool | Input | Output (JSON) |
+|---|---|---|
+| `repo_map` | `{ root?: string }` (default `"."`) | `{ root, found, contextMap, message? }` — `contextMap` is the `CONTEXT_MAP.md` content, or `null` with a `message` telling you to run `distill --write` first |
+| `get_file` | `{ root?: string, path: string, mode?: "summary" \| "full" }` (`mode` defaults to `"full"`) | `{ path, mode, found, content }` — if `mode: "summary"` is requested but no summary exists, falls back to full source and reports `mode: "full"` so callers can tell |
+| `context_report` | `{ root?: string, respectGitignore?: boolean }` | `scoreRepo()`'s result verbatim: `{ root, scannedAt, total, score, grade, files, skippedFiles }` |
+
+`get_file` rejects any `path` that resolves outside `root` (path traversal / absolute paths / other drives) with an MCP error result rather than reading the file.
+
 ## CI / CD
 
 ### Auto-update the badge on push
@@ -304,15 +325,15 @@ Token counting uses [`gpt-tokenizer`](https://www.npmjs.com/package/gpt-tokenize
 
 ## Requirements
 
-Node.js 16 or later. No API keys. No network.
+Node.js 16 or later. No API keys. No network. (`ai-readability mcp` needs Node.js 18+ and the optional `@modelcontextprotocol/sdk` + `zod` dependencies — see [MCP server](#mcp-server).)
 
 ## Contributing
 
 ```bash
-npm test   # runs 27 tests with node:test (no extra deps)
+npm test   # runs the suite with node:test (test/*.test.js)
 ```
 
-**To add a model or update prices:** edit [`src/pricing.js`](src/pricing.js) and update the `// prices as of YYYY-MM` date at the top.
+**To add a model or update prices:** edit [`src/pricing.js`](src/pricing.js) and bump `PRICING_UPDATED_AT`.
 
 **To add a generated-file pattern:** add a regex to `GEN_FILE` or a directory name to `GEN_DIRS` in [`src/core.js`](src/core.js).
 

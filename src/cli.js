@@ -15,6 +15,30 @@ const opt  = f => { const i = argv.indexOf(f); return i >= 0 ? argv[i + 1] : nul
 // ── `distill` subcommand ───────────────────────────────────────────────────────
 if (argv[0] === 'distill') runDistill(argv.slice(1));
 
+// ── `mcp` subcommand ─────────────────────────────────────────────────────────
+// @modelcontextprotocol/sdk is an optionalDependency (Node >=18, ~16 transitive
+// deps) — dynamically imported so a plain `ai-readability <path>` scan never
+// pays for it, and a missing/failed optional install only affects this command.
+if (argv[0] === 'mcp') {
+  try {
+    const { startMcpServer } = await import('./mcp/server.js');
+    await startMcpServer();
+    // The server already has active stdio listeners keeping the process alive.
+    // This just stops the script below (which writes human-readable output to
+    // the same stdout the JSON-RPC transport uses) from ever executing.
+    await new Promise(() => {});
+  } catch (err) {
+    if (err.code === 'ERR_MODULE_NOT_FOUND') {
+      console.error(
+        '\n  ✗  The MCP server needs an optional dependency that isn\'t installed.\n' +
+        '     Run: npm install @modelcontextprotocol/sdk zod\n'
+      );
+      process.exit(1);
+    }
+    throw err;
+  }
+}
+
 function runDistill(dargs) {
   const dhas = f => dargs.includes(f);
   const dopt = f => { const i = dargs.indexOf(f); return i >= 0 ? dargs[i + 1] : null; };
@@ -136,6 +160,8 @@ if (has('--help') || has('-h')) {
   ${kleur.bold('Usage')}
     ai-readability [path] [options]
     ai-readability distill [path] [options]   Generate compact context summaries
+    ai-readability mcp                        Start an MCP server on stdio (needs
+                                               @modelcontextprotocol/sdk + zod installed)
 
   ${kleur.bold('Options')}
     --cost           Show full per-model cost and context window table (14 models)

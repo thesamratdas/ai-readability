@@ -15,7 +15,7 @@
     "ai-readability": "src/cli.js"
   },
   "scripts": {
-    "test": "node --test test/index.test.js test/cli.test.js"
+    "test": "node --test test/index.test.js test/cli.test.js test/mcp.test.js"
   },
   "keywords": [
     "ai",
@@ -41,5 +41,13 @@
   "dependencies": {
     "gpt-tokenizer": "^3.4.0",
     "kleur": "^4.1.5"
+  },
+  "optionalDependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "zod": "^3.25.0"
+  },
+  "devDependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "zod": "^3.25.0"
   }
 }
