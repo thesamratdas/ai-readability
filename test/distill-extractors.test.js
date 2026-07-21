@@ -78,3 +78,58 @@ test('extractSkeleton (Go): handles multiple funcs and a plain (non-receiver) st
   assert.match(skeleton, /func FetchWithRetry\(url string, cfg RetryConfig\) \(string, error\) \{ … \}/);
   assert.doesNotMatch(skeleton, /lastErr/, 'body statement dropped');
 });
+
+// ── Java ────────────────────────────────────────────────────────────────────
+
+test('extractSkeleton (Java): keeps class javadoc, public method signatures, drops private members and bodies', () => {
+  const skeleton = extractSkeleton(read('java', 'Calculator.java'), '.java');
+
+  assert.match(skeleton, /A simple calculator supporting basic arithmetic/, 'class javadoc kept');
+  assert.match(skeleton, /public class Calculator \{/);
+  assert.match(skeleton, /public Calculator\(\) \{ … \}/, 'constructor kept');
+  assert.match(skeleton, /Adds a value to the running total/, 'method javadoc kept');
+  assert.match(skeleton, /public double add\(double value\) \{ … \}/);
+  assert.match(skeleton, /public double subtract\(double value\) \{ … \}/);
+  assert.match(skeleton, /public double getTotal\(\) \{ … \}/);
+
+  assert.doesNotMatch(skeleton, /applyRounding/, 'private method dropped entirely');
+  assert.doesNotMatch(skeleton, /this\.total \+= value/, 'body statement dropped');
+  assert.doesNotMatch(skeleton, /Math\.round/, 'private method body dropped');
+});
+
+test('extractSkeleton (Java): keeps interface method signatures (no bodies to drop)', () => {
+  const skeleton = extractSkeleton(read('java', 'PaymentGateway.java'), '.java');
+
+  assert.match(skeleton, /Contract implemented by all payment providers/);
+  assert.match(skeleton, /public interface PaymentGateway \{/);
+  assert.match(skeleton, /boolean charge\(String accountId, long amountCents\);/);
+  assert.match(skeleton, /void refund\(String transactionId\);/);
+  assert.match(skeleton, /enum PaymentStatus \{/);
+});
+
+// ── Kotlin ──────────────────────────────────────────────────────────────────
+
+test('extractSkeleton (Kotlin): keeps data class, class kdoc, public fun signatures, drops private members and bodies', () => {
+  const skeleton = extractSkeleton(read('kotlin', 'Repository.kt'), '.kt');
+
+  assert.match(skeleton, /A user record fetched from storage/, 'kdoc kept');
+  assert.match(skeleton, /data class User\(val id: String, val email: String, val active: Boolean = true\)/, 'one-line data class kept whole');
+  assert.match(skeleton, /class UserRepository\(private val db: Database\) \{/);
+  assert.match(skeleton, /Returns the user with the given id/, 'method kdoc kept');
+  assert.match(skeleton, /fun findById\(id: String\): User\? \{ … \}/);
+  assert.match(skeleton, /fun invalidate\(id: String\) \{ … \}/);
+
+  assert.doesNotMatch(skeleton, /logAccess/, 'private method dropped entirely');
+  assert.doesNotMatch(skeleton, /cache\[id\]/, 'body statement dropped');
+  assert.doesNotMatch(skeleton, /mutableMapOf/, 'private property dropped');
+});
+
+test('extractSkeleton (Kotlin): keeps interface/object/top-level fun signatures', () => {
+  const skeleton = extractSkeleton(read('kotlin', 'Notifier.kt'), '.kt');
+
+  assert.match(skeleton, /interface NotificationChannel \{/);
+  assert.match(skeleton, /object EmailChannel : NotificationChannel \{/);
+  assert.match(skeleton, /override fun send\(message: String\): Boolean \{ … \}/);
+  assert.match(skeleton, /fun buildGreeting\(name: String\): String \{ … \}/);
+  assert.doesNotMatch(skeleton, /emailing:/, 'body statement dropped');
+});

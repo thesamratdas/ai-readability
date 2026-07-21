@@ -217,7 +217,7 @@ npx ai-readability distill . --write    # write .ai/summaries/ + CONTEXT_MAP.md
 | `--respect-gitignore` | Exclude files matched by `.gitignore` |
 | `--json` | Machine-readable output |
 
-Skeletons are extracted **offline** (no API keys). Extraction is highest-fidelity for JS/TS (signatures, classes, interfaces); other languages get a best-effort declaration extract. Each summary embeds a `source-hash` so you can tell when it's gone stale — regenerate with `distill --write`.
+Skeletons are extracted **offline** (no API keys), with dedicated extractors for JS/TS (signatures, classes, interfaces), Python (`def`/`class`, decorators, docstrings), Go (`func`/`type`/`struct`/`interface`), and Java/Kotlin (public signatures — private members are dropped along with bodies). Other languages get a best-effort generic declaration extract. Each summary embeds a `source-hash` so you can tell when it's gone stale — regenerate with `distill --write`.
 
 Library API: `import { distillRepo, extractSkeleton, buildImportGraph, writeSummaries } from 'ai-readability'`.
 
