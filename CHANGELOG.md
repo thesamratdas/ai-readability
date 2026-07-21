@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.6.0] — 2026-07-14
+
+### Added
+- `ai-readability mcp`: MCP server on stdio with three tools — `repo_map`, `get_file` (with path-containment check), `context_report`. `@modelcontextprotocol/sdk` + `zod` are optional dependencies, dynamically loaded only when this command runs (needs Node 18+)
+- `distill` skeleton extraction now has dedicated extractors for Python, Go, and Java/Kotlin (previously JS/TS only, other languages fell back to a generic extractor)
+
 ## [0.5.0] — 2026-07-12
 
 ### Added
