@@ -1,6 +1,6 @@
 {
   "name": "ai-readability",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "description": "Score how AI-readable a codebase is — offline, no keys needed.",
   "type": "module",
   "main": "src/index.js",
